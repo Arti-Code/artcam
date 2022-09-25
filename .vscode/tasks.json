@@ -1,0 +1,23 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "[FFMPEG] HP Wide Vision HD Camera",
+            "type": "shell",
+            "command": "ffmpeg -f dshow -framerate 15 -i video=\"HP Wide Vision HD Camera\" -vf scale=480:320 -vcodec libvpx -f rtp rtp://127.0.0.1:5004?pkt_size=1200",
+            "problemMatcher": [
+                "$eslint-stylish"
+            ]
+        },
+        {
+            "label": "artcam",
+            "type": "shell",
+            "command": "./target/debug/artcam.exe",
+            "problemMatcher": [
+                "$eslint-stylish"
+            ]
+        }
+    ]
+}
