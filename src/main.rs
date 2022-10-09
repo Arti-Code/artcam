@@ -9,10 +9,13 @@ use tokio::net::UdpSocket;
 use webrtc::api::interceptor_registry::register_default_interceptors;
 use webrtc::api::media_engine::{MediaEngine, MIME_TYPE_VP8};
 use webrtc::api::APIBuilder;
+use webrtc::data_channel::data_channel_message::DataChannelMessage;
+use webrtc::data_channel::RTCDataChannel;
 use webrtc::ice_transport::ice_connection_state::RTCIceConnectionState;
 use webrtc::ice_transport::ice_server::RTCIceServer;
 use webrtc::interceptor::registry::Registry;
 use webrtc::peer_connection::configuration::RTCConfiguration;
+use webrtc::peer_connection::{math_rand_alpha};
 use webrtc::peer_connection::peer_connection_state::RTCPeerConnectionState;
 use webrtc::peer_connection::sdp::session_description::RTCSessionDescription;
 use webrtc::rtp_transceiver::rtp_codec::RTCRtpCodecCapability;
@@ -37,7 +40,7 @@ struct Offer {
 #[tokio::main]
 async fn main() -> Result<()> {
     let mut app = Command::new("rtp-forwarder")
-        .version("0.1.0")
+        .version("0.2.3")
         .author("Artur Gwoździowski")
         .about("An example of rtp-forwarder.")
         .setting(AppSettings::DeriveDisplayOrder)
@@ -68,7 +71,8 @@ async fn main() -> Result<()> {
         app.print_long_help().unwrap();
         std::process::exit(0);
     }
-
+    let version = Command::get_version(&app).unwrap();
+    println!("{}", version);
     let debug = matches.is_present("debug");
     if debug {
         env_logger::Builder::new()
@@ -130,6 +134,47 @@ async fn main() -> Result<()> {
     let (done_tx, mut done_rx) = tokio::sync::mpsc::channel::<()>(1);
     let done_tx1 = done_tx.clone();
     
+    let (data_tx, mut data_rx) = tokio::sync::mpsc::channel::<()>(1);
+    //let data_tx1 = data_tx.clone();
+
+    peer_connection
+        .on_data_channel(Box::new(move |d: Arc<RTCDataChannel>| {
+            let d_label = d.label().to_owned();
+            let d_id = d.id();
+            println!("New DataChannel {} {}", d_label, d_id);
+
+            Box::pin(async move {
+                let d2 = Arc::clone(&d);
+                let d_label2 = d_label.clone();
+                let d_id2 = d_id;
+                d.on_open(Box::new(move || {
+                    println!("Data channel '{}'-'{}' open. Random messages will now be sent to any connected DataChannels every 5 seconds", d_label2, d_id2);
+                    Box::pin(async move {
+                        let mut result = Result::<usize>::Ok(0);
+                        while result.is_ok() {
+                            let timeout = tokio::time::sleep(Duration::from_secs(5));
+                            tokio::pin!(timeout);
+
+                            tokio::select! {
+                                _ = timeout.as_mut() => {
+                                    let message = math_rand_alpha(15);
+                                    println!("Sending '{}'", message);
+                                    result = d2.send_text(message).await.map_err(Into::into);
+                                }
+                            };
+                        }
+                    })
+                })).await;
+
+                d.on_message(Box::new(move |msg: DataChannelMessage| {
+                    let msg_str = String::from_utf8(msg.data.to_vec()).unwrap();
+                    println!("'{}': '{}'", d_label, msg_str);
+                    Box::pin(async {})
+                })).await;
+            })
+        }))
+        .await;
+
     peer_connection
         .on_ice_connection_state_change(Box::new(move |connection_state: RTCIceConnectionState| {
             println!("Connection State has changed {}", connection_state);
