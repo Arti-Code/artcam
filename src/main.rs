@@ -66,7 +66,6 @@ async fn main() -> Result<()> {
         );
 
     let matches = app.clone().get_matches();
-
     if matches.is_present("FULLHELP") {
         app.print_long_help().unwrap();
         std::process::exit(0);
@@ -91,18 +90,14 @@ async fn main() -> Result<()> {
             .init();
     }
 
-    //let identify = value_t!(app, "IDENT", String).unwrap();
     let identify: String=String::from_str(&"kamera").unwrap();
     println!("device: {}", identify);
     println!("connecting...");
     sleep(Duration::from_secs(1)).await;
 
     let mut m = MediaEngine::default();
-
     m.register_default_codecs()?;
-
     let mut registry = Registry::new();
-
     registry = register_default_interceptors(registry, &mut m)?;
 
     let api = APIBuilder::new()
@@ -186,7 +181,7 @@ async fn main() -> Result<()> {
     
     //? [[[ODBIÓR OFERTY]]] ?/
     let firebase = Firebase::new("https://rtp-to-webrtc-default-rtdb.firebaseio.com")
-                                .unwrap().at("signaling").at(&identify).at("offer");
+        .unwrap().at("signaling").at(&identify).at("offer");
     let mut offer_ok: bool=false;
     let mut offer_encoded: String=String::new();
     println!("waiting for offer...");
@@ -212,45 +207,33 @@ async fn main() -> Result<()> {
     }
 
     println!("OFFER: [OK]");
-    //let line = signal::must_read_stdin()?;
     let desc_data = signal::decode(&offer_encoded)?;
     let offer = serde_json::from_str::<RTCSessionDescription>(&desc_data)?;
     peer_connection.set_remote_description(offer).await?;
     let answer = peer_connection.create_answer(None).await?;
 
-    // Create channel that is blocked until ICE Gathering is complete
     let mut gather_complete = peer_connection.gathering_complete_promise().await;
-    // Sets the LocalDescription, and starts our UDP listeners
     peer_connection.set_local_description(answer).await?;
-    // Block until ICE Gathering is complete, disabling trickle ICE
-    // we do this because we only can exchange one signaling message
-    // in a production application you should exchange ICE Candidates via OnICECandidate
     let _ = gather_complete.recv().await;
 
-    // Output the answer in base64 so we can paste it in browser
     if let Some(local_desc) = peer_connection.local_description().await {
         let json_str = serde_json::to_string(&local_desc)?;
         let b64 = signal::encode(&json_str);
         let firebase = Firebase::new("https://rtp-to-webrtc-default-rtdb.firebaseio.com")
-                                .unwrap().at("signaling").at(&identify);
+            .unwrap().at("signaling").at(&identify);
         let ans: Answer=Answer { answer: b64 };
         firebase.update(&ans).await.unwrap();
-        //println!("{}", b64);
     } else {
         println!("generate local_description failed!");
     }
 
-    // Open a UDP Listener for RTP Packets on port 5004
     let listener = UdpSocket::bind("127.0.0.1:5004").await?;
-
     let done_tx3 = done_tx.clone();
-    // Read RTP packets forever and send them to the WebRTC Client
     tokio::spawn(async move {
         let mut inbound_rtp_packet = vec![0u8; 1600]; // UDP MTU
         while let Ok((n, _)) = listener.recv_from(&mut inbound_rtp_packet).await {
             if let Err(err) = video_track.write(&inbound_rtp_packet[..n]).await {
                 if Error::ErrClosedPipe == err {
-                    // The peerConnection has been closed.
                 } else {
                     println!("video_track write err: {}", err);
                 }
@@ -271,6 +254,5 @@ async fn main() -> Result<()> {
     };
 
     peer_connection.close().await?;
-
     Ok(())
 }
