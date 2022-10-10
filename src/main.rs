@@ -9,10 +9,13 @@ use tokio::net::UdpSocket;
 use webrtc::api::interceptor_registry::register_default_interceptors;
 use webrtc::api::media_engine::{MediaEngine, MIME_TYPE_VP8};
 use webrtc::api::APIBuilder;
+use webrtc::data_channel::data_channel_message::DataChannelMessage;
+use webrtc::data_channel::RTCDataChannel;
 use webrtc::ice_transport::ice_connection_state::RTCIceConnectionState;
 use webrtc::ice_transport::ice_server::RTCIceServer;
 use webrtc::interceptor::registry::Registry;
 use webrtc::peer_connection::configuration::RTCConfiguration;
+//use webrtc::peer_connection::{math_rand_alpha};
 use webrtc::peer_connection::peer_connection_state::RTCPeerConnectionState;
 use webrtc::peer_connection::sdp::session_description::RTCSessionDescription;
 use webrtc::rtp_transceiver::rtp_codec::RTCRtpCodecCapability;
@@ -37,7 +40,7 @@ struct Offer {
 #[tokio::main]
 async fn main() -> Result<()> {
     let mut app = Command::new("rtp-forwarder")
-        .version("0.1.0")
+        .version("0.3.0")
         .author("Artur Gwoździowski")
         .about("An example of rtp-forwarder.")
         .setting(AppSettings::DeriveDisplayOrder)
@@ -63,12 +66,12 @@ async fn main() -> Result<()> {
         );
 
     let matches = app.clone().get_matches();
-
     if matches.is_present("FULLHELP") {
         app.print_long_help().unwrap();
         std::process::exit(0);
     }
-
+    let version = Command::get_version(&app).unwrap();
+    println!("{}", version);
     let debug = matches.is_present("debug");
     if debug {
         env_logger::Builder::new()
@@ -87,18 +90,14 @@ async fn main() -> Result<()> {
             .init();
     }
 
-    //let identify = value_t!(app, "IDENT", String).unwrap();
     let identify: String=String::from_str(&"kamera").unwrap();
     println!("device: {}", identify);
     println!("connecting...");
     sleep(Duration::from_secs(1)).await;
 
     let mut m = MediaEngine::default();
-
     m.register_default_codecs()?;
-
     let mut registry = Registry::new();
-
     registry = register_default_interceptors(registry, &mut m)?;
 
     let api = APIBuilder::new()
@@ -130,6 +129,32 @@ async fn main() -> Result<()> {
     let (done_tx, mut done_rx) = tokio::sync::mpsc::channel::<()>(1);
     let done_tx1 = done_tx.clone();
     
+    let (_data_tx, mut _data_rx) = tokio::sync::mpsc::channel::<()>(1);
+    //let data_tx1 = data_tx.clone();
+
+    peer_connection
+        .on_data_channel(Box::new(move |d: Arc<RTCDataChannel>| {
+            let d_label = d.label().to_owned();
+            let d_id = d.id();
+            println!("New DataChannel {} {}", d_label, d_id);
+
+            Box::pin(async move {
+                let _d2 = Arc::clone(&d);
+                let d_label2 = d_label.clone();
+                let d_id2 = d_id;
+                d.on_open(Box::new(move || {
+                    println!("[DATACHANNEL] {}<{}> open", d_label2, d_id2);
+                    Box::pin(async move {})
+                })).await;
+
+                d.on_message(Box::new(move |msg: DataChannelMessage| {
+                    let msg_str = String::from_utf8(msg.data.to_vec()).unwrap();
+                    println!("['{}']: '{}'", d_label, msg_str);
+                    Box::pin(async {})
+                })).await;
+            })
+        })).await;
+
     peer_connection
         .on_ice_connection_state_change(Box::new(move |connection_state: RTCIceConnectionState| {
             println!("Connection State has changed {}", connection_state);
@@ -156,7 +181,7 @@ async fn main() -> Result<()> {
     
     //? [[[ODBIÓR OFERTY]]] ?/
     let firebase = Firebase::new("https://rtp-to-webrtc-default-rtdb.firebaseio.com")
-                                .unwrap().at("signaling").at(&identify).at("offer");
+        .unwrap().at("signaling").at(&identify).at("offer");
     let mut offer_ok: bool=false;
     let mut offer_encoded: String=String::new();
     println!("waiting for offer...");
@@ -182,45 +207,33 @@ async fn main() -> Result<()> {
     }
 
     println!("OFFER: [OK]");
-    //let line = signal::must_read_stdin()?;
     let desc_data = signal::decode(&offer_encoded)?;
     let offer = serde_json::from_str::<RTCSessionDescription>(&desc_data)?;
     peer_connection.set_remote_description(offer).await?;
     let answer = peer_connection.create_answer(None).await?;
 
-    // Create channel that is blocked until ICE Gathering is complete
     let mut gather_complete = peer_connection.gathering_complete_promise().await;
-    // Sets the LocalDescription, and starts our UDP listeners
     peer_connection.set_local_description(answer).await?;
-    // Block until ICE Gathering is complete, disabling trickle ICE
-    // we do this because we only can exchange one signaling message
-    // in a production application you should exchange ICE Candidates via OnICECandidate
     let _ = gather_complete.recv().await;
 
-    // Output the answer in base64 so we can paste it in browser
     if let Some(local_desc) = peer_connection.local_description().await {
         let json_str = serde_json::to_string(&local_desc)?;
         let b64 = signal::encode(&json_str);
         let firebase = Firebase::new("https://rtp-to-webrtc-default-rtdb.firebaseio.com")
-                                .unwrap().at("signaling").at(&identify);
+            .unwrap().at("signaling").at(&identify);
         let ans: Answer=Answer { answer: b64 };
         firebase.update(&ans).await.unwrap();
-        //println!("{}", b64);
     } else {
         println!("generate local_description failed!");
     }
 
-    // Open a UDP Listener for RTP Packets on port 5004
     let listener = UdpSocket::bind("127.0.0.1:5004").await?;
-
     let done_tx3 = done_tx.clone();
-    // Read RTP packets forever and send them to the WebRTC Client
     tokio::spawn(async move {
         let mut inbound_rtp_packet = vec![0u8; 1600]; // UDP MTU
         while let Ok((n, _)) = listener.recv_from(&mut inbound_rtp_packet).await {
             if let Err(err) = video_track.write(&inbound_rtp_packet[..n]).await {
                 if Error::ErrClosedPipe == err {
-                    // The peerConnection has been closed.
                 } else {
                     println!("video_track write err: {}", err);
                 }
@@ -241,6 +254,5 @@ async fn main() -> Result<()> {
     };
 
     peer_connection.close().await?;
-
     Ok(())
 }
