@@ -39,10 +39,10 @@ struct Offer {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let mut app = Command::new("rtp-forwarder")
-        .version("0.3.0")
+    let mut app = Command::new("ArtCam")
+        .version("0.3.2")
         .author("Artur Gwoździowski")
-        .about("An example of rtp-forwarder.")
+        .about("RUST implementation of robotic peer application used to remote control device with real-time camera stream through public internet.")
         .setting(AppSettings::DeriveDisplayOrder)
         .subcommand_negates_reqs(true)
         .arg(
@@ -64,14 +64,19 @@ async fn main() -> Result<()> {
                 .short('d')
                 .help("Prints debug log information"),
         );
-
     let matches = app.clone().get_matches();
     if matches.is_present("FULLHELP") {
         app.print_long_help().unwrap();
         std::process::exit(0);
     }
     let version = Command::get_version(&app).unwrap();
-    println!("{}", version);
+    let app_name = Command::get_name(&app);
+    let author = Command::get_author(&app).unwrap();
+    let desctiption = app.get_about().unwrap();
+    println!("{}     [v{}]", app_name, version);
+    println!("author: {}", author);
+    println!("{}", desctiption);
+    sleep(Duration::from_secs(6)).await;
     let debug = matches.is_present("debug");
     if debug {
         env_logger::Builder::new()
@@ -136,7 +141,7 @@ async fn main() -> Result<()> {
         .on_data_channel(Box::new(move |d: Arc<RTCDataChannel>| {
             let d_label = d.label().to_owned();
             let d_id = d.id();
-            println!("New DataChannel {} {}", d_label, d_id);
+            println!("[NEW DATACHANNEL]: {} {}", d_label, d_id);
 
             Box::pin(async move {
                 let _d2 = Arc::clone(&d);
@@ -149,7 +154,7 @@ async fn main() -> Result<()> {
 
                 d.on_message(Box::new(move |msg: DataChannelMessage| {
                     let msg_str = String::from_utf8(msg.data.to_vec()).unwrap();
-                    println!("['{}']: '{}'", d_label, msg_str);
+                    println!("[↓]: {}", msg_str);
                     Box::pin(async {})
                 })).await;
             })
