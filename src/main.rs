@@ -40,7 +40,7 @@ struct Offer {
 #[tokio::main]
 async fn main() -> Result<()> {
     let mut app = Command::new("rtp-forwarder")
-        .version("0.2.5")
+        .version("0.3.0")
         .author("Artur Gwoździowski")
         .about("An example of rtp-forwarder.")
         .setting(AppSettings::DeriveDisplayOrder)
