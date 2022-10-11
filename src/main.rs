@@ -1,7 +1,5 @@
 use anyhow::Result;
-use clap::{AppSettings, Arg, Command};
 use tokio::time::sleep;
-use std::io::Write;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -16,7 +14,6 @@ use webrtc::ice_transport::ice_server::RTCIceServer;
 use webrtc::ice_transport::ice_credential_type::RTCIceCredentialType;
 use webrtc::interceptor::registry::Registry;
 use webrtc::peer_connection::configuration::RTCConfiguration;
-//use webrtc::peer_connection::{math_rand_alpha};
 use webrtc::peer_connection::peer_connection_state::RTCPeerConnectionState;
 use webrtc::peer_connection::sdp::session_description::RTCSessionDescription;
 use webrtc::rtp_transceiver::rtp_codec::RTCRtpCodecCapability;
@@ -40,61 +37,14 @@ struct Offer {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let mut app = Command::new("ArtCam(xirys)")
-        .version("0.3.3")
-        .author("Artur Gwoździowski")
-        .about("RUST implementation of robotic peer application used to remote control device with real-time camera stream through public internet.")
-        .setting(AppSettings::DeriveDisplayOrder)
-        .subcommand_negates_reqs(true)
-        .arg(
-            Arg::new("IDENT")
-                .help("some kind of callsign to identifying peer and data-channel name")
-                .long("ident")
-                .short('i')
-                .takes_value(true)
-                .default_value(&"kamerka")
-        )
-        .arg(
-            Arg::new("FULLHELP")
-                .help("Prints more detailed help information")
-                .long("fullhelp"),
-        )
-        .arg(
-            Arg::new("debug")
-                .long("debug")
-                .short('d')
-                .help("Prints debug log information"),
-        );
-    let matches = app.clone().get_matches();
-    if matches.is_present("FULLHELP") {
-        app.print_long_help().unwrap();
-        std::process::exit(0);
-    }
-    let version = Command::get_version(&app).unwrap();
-    let app_name = Command::get_name(&app);
-    let author = Command::get_author(&app).unwrap();
-    let desctiption = app.get_about().unwrap();
+    let app_name = "ArtCam(simple)";
+    let version = "0.3.3";
+    let author = "Artur Gwoździowski";
+    let desctiption = "RUST implementation of robotic peer application used to remote control device with real-time camera stream through public internet.";
     println!("{}     [v{}]", app_name, version);
     println!("author: {}", author);
     println!("{}", desctiption);
     sleep(Duration::from_secs(6)).await;
-    let debug = matches.is_present("debug");
-    if debug {
-        env_logger::Builder::new()
-            .format(|buf, record| {
-                writeln!(
-                    buf,
-                    "{}:{} [{}] {} - {}",
-                    record.file().unwrap_or("unknown"),
-                    record.line().unwrap_or(0),
-                    record.level(),
-                    chrono::Local::now().format("%H:%M:%S.%6f"),
-                    record.args()
-                )
-            })
-            .filter(None, log::LevelFilter::Trace)
-            .init();
-    }
 
     let identify: String=String::from_str(&"kamera").unwrap();
     println!("device: {}", identify);
@@ -111,12 +61,6 @@ async fn main() -> Result<()> {
         .with_interceptor_registry(registry)
         .build();
 
-/*     let mut config = RTCConfiguration {
-        ice_servers: vec![RTCIceServer {
-            urls: vec!["stun:stun.l.google.com:19302".to_owned(),
-            ], ..Default::default()}],
-        ..Default::default()
-    }; */
     let config = RTCConfiguration {
         ice_servers: vec![RTCIceServer {
             urls: vec!["stun:fr-turn1.xirsys.com".to_owned()],
@@ -126,14 +70,11 @@ async fn main() -> Result<()> {
         }],
         ..Default::default()
     };
-    //config.ice_servers.append(&mut xiris);
     
     let peer_connection = Arc::new(api.new_peer_connection(config).await?);
-
     let video_track = Arc::new(TrackLocalStaticRTP::new(
         RTCRtpCodecCapability {mime_type: MIME_TYPE_VP8.to_owned(),
             ..Default::default()}, "video".to_owned(), "webrtc-rs".to_owned(), ));
-
     let rtp_sender = peer_connection
         .add_track(Arc::clone(&video_track) as Arc<dyn TrackLocal + Send + Sync>).await?;
 
@@ -145,9 +86,7 @@ async fn main() -> Result<()> {
 
     let (done_tx, mut done_rx) = tokio::sync::mpsc::channel::<()>(1);
     let done_tx1 = done_tx.clone();
-    
     let (_data_tx, mut _data_rx) = tokio::sync::mpsc::channel::<()>(1);
-    //let data_tx1 = data_tx.clone();
 
     peer_connection
         .on_data_channel(Box::new(move |d: Arc<RTCDataChannel>| {
@@ -196,13 +135,13 @@ async fn main() -> Result<()> {
             Box::pin(async {})
         })).await;
     
-    //? [[[ODBIÓR OFERTY]]] ?/
     let firebase = Firebase::new("https://rtp-to-webrtc-default-rtdb.firebaseio.com")
         .unwrap().at("signaling").at(&identify).at("offer");
     let mut offer_ok: bool=false;
     let mut offer_encoded: String=String::new();
     println!("waiting for offer...");
     sleep(Duration::from_secs(1)).await;
+    
     while !offer_ok {
         let encod = firebase.get::<String>().await;
         match encod  {
