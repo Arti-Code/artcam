@@ -111,19 +111,22 @@ async fn main() -> Result<()> {
         .with_interceptor_registry(registry)
         .build();
 
-    let mut config = RTCConfiguration {
+/*     let mut config = RTCConfiguration {
         ice_servers: vec![RTCIceServer {
             urls: vec!["stun:stun.l.google.com:19302".to_owned(),
             ], ..Default::default()}],
         ..Default::default()
+    }; */
+    let config = RTCConfiguration {
+        ice_servers: vec![RTCIceServer {
+            urls: vec!["stun:fr-turn1.xirsys.com".to_owned()],
+            username: "23Xgr3XVCOk2GqoZW5eWhbdXM1EfA8VcC6OVVacJSpFdoljTUOsTcgAoFUvfN4vcAAAAAGNFN29nd296ZHlrMg==".to_owned(),
+            credential: "2ed490ce-4947-11ed-bd3d-0242ac120004".to_owned(),
+            credential_type: RTCIceCredentialType::Password.to_owned()
+        }],
+        ..Default::default()
     };
-    let mut xiris = vec![RTCIceServer {
-        urls: vec!["stun:fr-turn1.xirsys.com".to_owned()],
-        username: "23Xgr3XVCOk2GqoZW5eWhbdXM1EfA8VcC6OVVacJSpFdoljTUOsTcgAoFUvfN4vcAAAAAGNFN29nd296ZHlrMg==".to_owned(),
-        credential: "2ed490ce-4947-11ed-bd3d-0242ac120004".to_owned(),
-        credential_type: RTCIceCredentialType::Password.to_owned()
-    }];
-    config.ice_servers.append(&mut xiris);
+    //config.ice_servers.append(&mut xiris);
     
     let peer_connection = Arc::new(api.new_peer_connection(config).await?);
 
