@@ -13,6 +13,7 @@ use webrtc::data_channel::data_channel_message::DataChannelMessage;
 use webrtc::data_channel::RTCDataChannel;
 use webrtc::ice_transport::ice_connection_state::RTCIceConnectionState;
 use webrtc::ice_transport::ice_server::RTCIceServer;
+use webrtc::ice_transport::ice_credential_type::RTCIceCredentialType;
 use webrtc::interceptor::registry::Registry;
 use webrtc::peer_connection::configuration::RTCConfiguration;
 //use webrtc::peer_connection::{math_rand_alpha};
@@ -39,8 +40,8 @@ struct Offer {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let mut app = Command::new("ArtCam")
-        .version("0.3.2")
+    let mut app = Command::new("ArtCam(xirys)")
+        .version("0.3.3")
         .author("Artur Gwoździowski")
         .about("RUST implementation of robotic peer application used to remote control device with real-time camera stream through public internet.")
         .setting(AppSettings::DeriveDisplayOrder)
@@ -110,12 +111,20 @@ async fn main() -> Result<()> {
         .with_interceptor_registry(registry)
         .build();
 
-    let config = RTCConfiguration {
-        ice_servers: vec![RTCIceServer {urls: vec!["stun:stun.l.google.com:19302".to_owned()],
-            ..Default::default()}],
+    let mut config = RTCConfiguration {
+        ice_servers: vec![RTCIceServer {
+            urls: vec!["stun:stun.l.google.com:19302".to_owned(),
+            ], ..Default::default()}],
         ..Default::default()
     };
-
+    let mut xiris = vec![RTCIceServer {
+        urls: vec!["stun:fr-turn1.xirsys.com".to_owned()],
+        username: "23Xgr3XVCOk2GqoZW5eWhbdXM1EfA8VcC6OVVacJSpFdoljTUOsTcgAoFUvfN4vcAAAAAGNFN29nd296ZHlrMg==".to_owned(),
+        credential: "2ed490ce-4947-11ed-bd3d-0242ac120004".to_owned(),
+        credential_type: RTCIceCredentialType::Password.to_owned()
+    }];
+    config.ice_servers.append(&mut xiris);
+    
     let peer_connection = Arc::new(api.new_peer_connection(config).await?);
 
     let video_track = Arc::new(TrackLocalStaticRTP::new(
