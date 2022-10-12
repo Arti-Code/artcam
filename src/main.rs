@@ -1,3 +1,5 @@
+#[allow(dead_code)]
+
 use anyhow::Result;
 use tokio::time::sleep;
 use std::str::FromStr;
@@ -34,22 +36,64 @@ struct Offer {
     offer: String
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+struct Application {
+    name: String,
+    version: String,
+    author: String,
+    description: String,
+    date: String
+}
+
+impl Application {
+    fn new(&self, name: &str, version: &str, author: &str, description: &str, date: &str) -> Self {
+        Self {
+            name: name.to_string(),
+            version: version.to_string(),
+            author: author.to_string(),
+            description: description.to_string(),
+            date: date.to_string()
+        }
+    }
+    fn get_name(&self) -> String {
+        format!("program name {}", self.name)
+    }
+    fn get_version(&self) -> String {
+        format!("version {}", self.version)
+    }
+    fn get_author(&self) -> String {
+        format!("programmer {}", self.author)
+    }
+    fn get_description(&self) -> String {
+        format!("{}", self.description)
+    }
+    fn get_date(&self) -> String {
+        format!("release date {}", self.date)
+    }
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let app_name = "ArtCam(simple)";
-    let version = "0.3.3";
-    let author = "Artur Gwoździowski";
-    let desctiption = "RUST implementation of robotic peer application used to remote control device with real-time camera stream through public internet.";
-    println!("{}     [v{}]", app_name, version);
-    println!("author: {}", author);
-    println!("{}", desctiption);
-    sleep(Duration::from_secs(6)).await;
+    let app: Application=Application {
+        name: "ArtCam (restructured)".to_owned(),
+        version: "0.3.5".to_owned(),
+        author: "Artur Gwoździowski".to_owned(),
+        description:
+        "\tService application used to remote controll robots. 
+        Implemented in RUST programming language.
+        Main features: 
+        ability to establish p2p connection over public internet, 
+        real-time robot camera video streaming, 
+        sending commands to robot and sending back telemetry data"
+        .to_owned(),
+        date: "2022-10-10".to_owned()
+    };
+    intro(&app).await;
 
     let identify: String=String::from_str(&"kamera").unwrap();
     println!("device: {}", identify);
     println!("connecting...");
-    sleep(Duration::from_secs(1)).await;
+    wait(1).await;
 
     let mut m = MediaEngine::default();
     m.register_default_codecs()?;
@@ -211,4 +255,21 @@ async fn main() -> Result<()> {
 
     peer_connection.close().await?;
     Ok(())
+}
+
+async fn wait(seconds: u32) {
+    sleep(Duration::from_secs(seconds as u64)).await;
+}
+
+async fn intro(app: &Application) {
+    println!("{}", app.get_name());
+    wait(1).await;
+    println!("{}", app.get_version());
+    wait(1).await;
+    println!("{}", app.get_author());
+    wait(1).await;
+    println!("{}", app.get_date());
+    wait(1).await;
+    println!("{}", app.get_description());
+    wait(3).await;
 }

@@ -1,6 +1,6 @@
 [package]
-name = "artcam_simple"
-version = "0.3.3"
+name = "artcam_restruct"
+version = "0.3.5"
 edition = "2021"
 authors = ["Artur Gwoździowski <gwozdyk@gmail.com>"]
 
