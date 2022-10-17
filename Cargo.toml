@@ -1,6 +1,6 @@
 [package]
-name = "artcam"
-version = "0.3.3"
+name = "artcam_restruct"
+version = "0.3.5"
 edition = "2021"
 authors = ["Artur Gwoździowski <gwozdyk@gmail.com>"]
 
@@ -11,7 +11,6 @@ authors = ["Artur Gwoździowski <gwozdyk@gmail.com>"]
 webrtc = "0.5.1"
 tokio = { version = "1.21.1", features = ["full"] }
 env_logger = "0.9.1"
-clap = "3.2.22"
 hyper = { version = "0.14.20", features = ["full"] }
 signal = {path = "signal" }
 tokio-util = "0.7.4"

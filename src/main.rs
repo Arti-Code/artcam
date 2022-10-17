@@ -1,7 +1,7 @@
+#[allow(dead_code)]
+
 use anyhow::Result;
-use clap::{AppSettings, Arg, Command};
 use tokio::time::sleep;
-use std::io::Write;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -16,7 +16,6 @@ use webrtc::ice_transport::ice_server::RTCIceServer;
 use webrtc::ice_transport::ice_credential_type::RTCIceCredentialType;
 use webrtc::interceptor::registry::Registry;
 use webrtc::peer_connection::configuration::RTCConfiguration;
-//use webrtc::peer_connection::{math_rand_alpha};
 use webrtc::peer_connection::peer_connection_state::RTCPeerConnectionState;
 use webrtc::peer_connection::sdp::session_description::RTCSessionDescription;
 use webrtc::rtp_transceiver::rtp_codec::RTCRtpCodecCapability;
@@ -37,69 +36,64 @@ struct Offer {
     offer: String
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+struct Application {
+    name: String,
+    version: String,
+    author: String,
+    description: String,
+    date: String
+}
+
+impl Application {
+    //fn new(&self, name: &str, version: &str, author: &str, description: &str, date: &str) -> Self {
+    //    Self {
+    //        name: name.to_string(),
+    //        version: version.to_string(),
+    //        author: author.to_string(),
+    //        description: description.to_string(),
+    //        date: date.to_string()
+    //    }
+    //}
+    fn get_name(&self) -> String {
+        format!("program name {}", self.name)
+    }
+    fn get_version(&self) -> String {
+        format!("version {}", self.version)
+    }
+    fn get_author(&self) -> String {
+        format!("programmer {}", self.author)
+    }
+    fn get_description(&self) -> String {
+        format!("{}", self.description)
+    }
+    fn get_date(&self) -> String {
+        format!("release date {}", self.date)
+    }
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let mut app = Command::new("ArtCam(xirys)")
-        .version("0.3.3")
-        .author("Artur Gwoździowski")
-        .about("RUST implementation of robotic peer application used to remote control device with real-time camera stream through public internet.")
-        .setting(AppSettings::DeriveDisplayOrder)
-        .subcommand_negates_reqs(true)
-        .arg(
-            Arg::new("IDENT")
-                .help("some kind of callsign to identifying peer and data-channel name")
-                .long("ident")
-                .short('i')
-                .takes_value(true)
-                .default_value(&"kamerka")
-        )
-        .arg(
-            Arg::new("FULLHELP")
-                .help("Prints more detailed help information")
-                .long("fullhelp"),
-        )
-        .arg(
-            Arg::new("debug")
-                .long("debug")
-                .short('d')
-                .help("Prints debug log information"),
-        );
-    let matches = app.clone().get_matches();
-    if matches.is_present("FULLHELP") {
-        app.print_long_help().unwrap();
-        std::process::exit(0);
-    }
-    let version = Command::get_version(&app).unwrap();
-    let app_name = Command::get_name(&app);
-    let author = Command::get_author(&app).unwrap();
-    let desctiption = app.get_about().unwrap();
-    println!("{}     [v{}]", app_name, version);
-    println!("author: {}", author);
-    println!("{}", desctiption);
-    sleep(Duration::from_secs(6)).await;
-    let debug = matches.is_present("debug");
-    if debug {
-        env_logger::Builder::new()
-            .format(|buf, record| {
-                writeln!(
-                    buf,
-                    "{}:{} [{}] {} - {}",
-                    record.file().unwrap_or("unknown"),
-                    record.line().unwrap_or(0),
-                    record.level(),
-                    chrono::Local::now().format("%H:%M:%S.%6f"),
-                    record.args()
-                )
-            })
-            .filter(None, log::LevelFilter::Trace)
-            .init();
-    }
+    let app: Application=Application {
+        name: "ArtCam (restructured)".to_owned(),
+        version: "0.3.5".to_owned(),
+        author: "Artur Gwoździowski".to_owned(),
+        description:
+        "\tService application used to remote controll robots. 
+        Implemented in RUST programming language.
+        Main features: 
+        ability to establish p2p connection over public internet, 
+        real-time robot camera video streaming, 
+        sending commands to robot and sending back telemetry data"
+        .to_owned(),
+        date: "2022-10-10".to_owned()
+    };
+    intro(&app).await;
 
     let identify: String=String::from_str(&"kamera").unwrap();
     println!("device: {}", identify);
     println!("connecting...");
-    sleep(Duration::from_secs(1)).await;
+    wait(1).await;
 
     let mut m = MediaEngine::default();
     m.register_default_codecs()?;
@@ -111,26 +105,20 @@ async fn main() -> Result<()> {
         .with_interceptor_registry(registry)
         .build();
 
-    let mut config = RTCConfiguration {
+    let config = RTCConfiguration {
         ice_servers: vec![RTCIceServer {
-            urls: vec!["stun:stun.l.google.com:19302".to_owned(),
-            ], ..Default::default()}],
+            urls: vec!["stun:fr-turn1.xirsys.com".to_owned()],
+            username: "23Xgr3XVCOk2GqoZW5eWhbdXM1EfA8VcC6OVVacJSpFdoljTUOsTcgAoFUvfN4vcAAAAAGNFN29nd296ZHlrMg==".to_owned(),
+            credential: "2ed490ce-4947-11ed-bd3d-0242ac120004".to_owned(),
+            credential_type: RTCIceCredentialType::Password.to_owned()
+        }],
         ..Default::default()
     };
-    let mut xiris = vec![RTCIceServer {
-        urls: vec!["stun:fr-turn1.xirsys.com".to_owned()],
-        username: "23Xgr3XVCOk2GqoZW5eWhbdXM1EfA8VcC6OVVacJSpFdoljTUOsTcgAoFUvfN4vcAAAAAGNFN29nd296ZHlrMg==".to_owned(),
-        credential: "2ed490ce-4947-11ed-bd3d-0242ac120004".to_owned(),
-        credential_type: RTCIceCredentialType::Password.to_owned()
-    }];
-    config.ice_servers.append(&mut xiris);
     
     let peer_connection = Arc::new(api.new_peer_connection(config).await?);
-
     let video_track = Arc::new(TrackLocalStaticRTP::new(
         RTCRtpCodecCapability {mime_type: MIME_TYPE_VP8.to_owned(),
             ..Default::default()}, "video".to_owned(), "webrtc-rs".to_owned(), ));
-
     let rtp_sender = peer_connection
         .add_track(Arc::clone(&video_track) as Arc<dyn TrackLocal + Send + Sync>).await?;
 
@@ -142,9 +130,7 @@ async fn main() -> Result<()> {
 
     let (done_tx, mut done_rx) = tokio::sync::mpsc::channel::<()>(1);
     let done_tx1 = done_tx.clone();
-    
     let (_data_tx, mut _data_rx) = tokio::sync::mpsc::channel::<()>(1);
-    //let data_tx1 = data_tx.clone();
 
     peer_connection
         .on_data_channel(Box::new(move |d: Arc<RTCDataChannel>| {
@@ -193,34 +179,8 @@ async fn main() -> Result<()> {
             Box::pin(async {})
         })).await;
     
-    //? [[[ODBIÓR OFERTY]]] ?/
-    let firebase = Firebase::new("https://rtp-to-webrtc-default-rtdb.firebaseio.com")
-        .unwrap().at("signaling").at(&identify).at("offer");
-    let mut offer_ok: bool=false;
-    let mut offer_encoded: String=String::new();
-    println!("waiting for offer...");
-    sleep(Duration::from_secs(1)).await;
-    while !offer_ok {
-        let encod = firebase.get::<String>().await;
-        match encod  {
-            Ok(v) if v != "" => {
-                offer_encoded = v;
-                offer_ok = true;
-                let firebase2 = Firebase::new("https://rtp-to-webrtc-default-rtdb.firebaseio.com")
-                                            .unwrap().at("signaling").at(&identify);
-                let clear_offer: Offer=Offer { offer: "".to_string() };
-                firebase2.update(&clear_offer).await.unwrap();
-            },
-            Ok(_) => {
-                sleep(Duration::from_secs(3)).await;
-            },
-            Err(_) => {
-                sleep(Duration::from_secs(3)).await;
-            }
-        }
-    }
+    let offer_encoded = wait_offer(&identify).await;
 
-    println!("OFFER: [OK]");
     let desc_data = signal::decode(&offer_encoded)?;
     let offer = serde_json::from_str::<RTCSessionDescription>(&desc_data)?;
     peer_connection.set_remote_description(offer).await?;
@@ -231,12 +191,7 @@ async fn main() -> Result<()> {
     let _ = gather_complete.recv().await;
 
     if let Some(local_desc) = peer_connection.local_description().await {
-        let json_str = serde_json::to_string(&local_desc)?;
-        let b64 = signal::encode(&json_str);
-        let firebase = Firebase::new("https://rtp-to-webrtc-default-rtdb.firebaseio.com")
-            .unwrap().at("signaling").at(&identify);
-        let ans: Answer=Answer { answer: b64 };
-        firebase.update(&ans).await.unwrap();
+        send_answer(&local_desc, &identify).await;
     } else {
         println!("generate local_description failed!");
     }
@@ -269,4 +224,61 @@ async fn main() -> Result<()> {
 
     peer_connection.close().await?;
     Ok(())
+}
+
+async fn wait(seconds: u32) {
+    sleep(Duration::from_secs(seconds as u64)).await;
+}
+
+async fn intro(app: &Application) {
+    println!("{}", app.get_name());
+    wait(1).await;
+    println!("{}", app.get_version());
+    wait(1).await;
+    println!("{}", app.get_author());
+    wait(1).await;
+    println!("{}", app.get_date());
+    wait(1).await;
+    println!("{}", app.get_description());
+    wait(3).await;
+}
+
+async fn wait_offer(device: &str) -> String {
+    let firebase = Firebase::new("https://rtp-to-webrtc-default-rtdb.firebaseio.com")
+        .unwrap().at("signaling").at(&device).at("offer");
+    let mut offer_founded: bool=false;
+    let mut offer_b64: String=String::new();
+    println!("waiting for offer...");
+    sleep(Duration::from_secs(1)).await;
+    
+    while !offer_founded {
+        let encod = firebase.get::<String>().await;
+        match encod  {
+            Ok(v) if v != "" => {
+                offer_b64 = v;
+                offer_founded = true;
+                let firebase2 = Firebase::new("https://rtp-to-webrtc-default-rtdb.firebaseio.com")
+                    .unwrap().at("signaling").at(&device);
+                let clear_offer: Offer=Offer { offer: "".to_string() };
+                firebase2.update(&clear_offer).await.unwrap();
+            },
+            Ok(_) => {
+                sleep(Duration::from_secs(3)).await;
+            },
+            Err(_) => {
+                sleep(Duration::from_secs(3)).await;
+            }
+        }
+    }
+    println!("OFFER: [OK]");
+    offer_b64
+}
+
+async fn send_answer(answer: &RTCSessionDescription, device: &str) {
+    let json_str = serde_json::to_string(answer).unwrap();
+    let b64 = signal::encode(&json_str);
+    let firebase = Firebase::new("https://rtp-to-webrtc-default-rtdb.firebaseio.com")
+        .unwrap().at("signaling").at(device);
+    let ans: Answer=Answer { answer: b64 };
+    firebase.update(&ans).await.unwrap();
 }
