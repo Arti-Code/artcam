@@ -46,15 +46,15 @@ struct Application {
 }
 
 impl Application {
-    fn new(&self, name: &str, version: &str, author: &str, description: &str, date: &str) -> Self {
-        Self {
-            name: name.to_string(),
-            version: version.to_string(),
-            author: author.to_string(),
-            description: description.to_string(),
-            date: date.to_string()
-        }
-    }
+    //fn new(&self, name: &str, version: &str, author: &str, description: &str, date: &str) -> Self {
+    //    Self {
+    //        name: name.to_string(),
+    //        version: version.to_string(),
+    //        author: author.to_string(),
+    //        description: description.to_string(),
+    //        date: date.to_string()
+    //    }
+    //}
     fn get_name(&self) -> String {
         format!("program name {}", self.name)
     }
@@ -179,34 +179,8 @@ async fn main() -> Result<()> {
             Box::pin(async {})
         })).await;
     
-    let firebase = Firebase::new("https://rtp-to-webrtc-default-rtdb.firebaseio.com")
-        .unwrap().at("signaling").at(&identify).at("offer");
-    let mut offer_ok: bool=false;
-    let mut offer_encoded: String=String::new();
-    println!("waiting for offer...");
-    sleep(Duration::from_secs(1)).await;
-    
-    while !offer_ok {
-        let encod = firebase.get::<String>().await;
-        match encod  {
-            Ok(v) if v != "" => {
-                offer_encoded = v;
-                offer_ok = true;
-                let firebase2 = Firebase::new("https://rtp-to-webrtc-default-rtdb.firebaseio.com")
-                                            .unwrap().at("signaling").at(&identify);
-                let clear_offer: Offer=Offer { offer: "".to_string() };
-                firebase2.update(&clear_offer).await.unwrap();
-            },
-            Ok(_) => {
-                sleep(Duration::from_secs(3)).await;
-            },
-            Err(_) => {
-                sleep(Duration::from_secs(3)).await;
-            }
-        }
-    }
+    let offer_encoded = wait_offer(&identify).await;
 
-    println!("OFFER: [OK]");
     let desc_data = signal::decode(&offer_encoded)?;
     let offer = serde_json::from_str::<RTCSessionDescription>(&desc_data)?;
     peer_connection.set_remote_description(offer).await?;
@@ -217,12 +191,7 @@ async fn main() -> Result<()> {
     let _ = gather_complete.recv().await;
 
     if let Some(local_desc) = peer_connection.local_description().await {
-        let json_str = serde_json::to_string(&local_desc)?;
-        let b64 = signal::encode(&json_str);
-        let firebase = Firebase::new("https://rtp-to-webrtc-default-rtdb.firebaseio.com")
-            .unwrap().at("signaling").at(&identify);
-        let ans: Answer=Answer { answer: b64 };
-        firebase.update(&ans).await.unwrap();
+        send_answer(&local_desc, &identify).await;
     } else {
         println!("generate local_description failed!");
     }
@@ -272,4 +241,44 @@ async fn intro(app: &Application) {
     wait(1).await;
     println!("{}", app.get_description());
     wait(3).await;
+}
+
+async fn wait_offer(device: &str) -> String {
+    let firebase = Firebase::new("https://rtp-to-webrtc-default-rtdb.firebaseio.com")
+        .unwrap().at("signaling").at(&device).at("offer");
+    let mut offer_founded: bool=false;
+    let mut offer_b64: String=String::new();
+    println!("waiting for offer...");
+    sleep(Duration::from_secs(1)).await;
+    
+    while !offer_founded {
+        let encod = firebase.get::<String>().await;
+        match encod  {
+            Ok(v) if v != "" => {
+                offer_b64 = v;
+                offer_founded = true;
+                let firebase2 = Firebase::new("https://rtp-to-webrtc-default-rtdb.firebaseio.com")
+                    .unwrap().at("signaling").at(&device);
+                let clear_offer: Offer=Offer { offer: "".to_string() };
+                firebase2.update(&clear_offer).await.unwrap();
+            },
+            Ok(_) => {
+                sleep(Duration::from_secs(3)).await;
+            },
+            Err(_) => {
+                sleep(Duration::from_secs(3)).await;
+            }
+        }
+    }
+    println!("OFFER: [OK]");
+    offer_b64
+}
+
+async fn send_answer(answer: &RTCSessionDescription, device: &str) {
+    let json_str = serde_json::to_string(answer).unwrap();
+    let b64 = signal::encode(&json_str);
+    let firebase = Firebase::new("https://rtp-to-webrtc-default-rtdb.firebaseio.com")
+        .unwrap().at("signaling").at(device);
+    let ans: Answer=Answer { answer: b64 };
+    firebase.update(&ans).await.unwrap();
 }
