@@ -71,20 +71,20 @@ impl Application {
     //        date: date.to_string()
     //    }
     //}
-    fn get_name(&self) -> String {
-        format!("program name {}", self.name)
+    fn get_name(&self) -> &str {
+        &self.name
     }
-    fn get_version(&self) -> String {
-        format!("version {}", self.version)
+    fn get_version(&self) -> &str {
+        &self.version
     }
-    fn get_author(&self) -> String {
-        format!("programmer {}", self.author)
+    fn get_author(&self) -> &str {
+        &self.author
     }
-    fn get_description(&self) -> String {
-        format!("{}", self.description)
+    fn get_description(&self) -> &str {
+        &self.description
     }
-    fn get_date(&self) -> String {
-        format!("release date {}", self.date)
+    fn get_date(&self) -> &str {
+        &self.date
     }
 }
 
@@ -240,7 +240,7 @@ async fn create_device(name: &str) -> Device {
 
 async fn create_application() -> Application {
     let app: Application=Application {
-        name: "ArtCam (restructured)".to_owned(),
+        name: "ArtCam".to_owned(),
         version: "0.3.6".to_owned(),
         author: "Artur Gwoździowski".to_owned(),
         description:
@@ -257,11 +257,11 @@ async fn create_application() -> Application {
 async fn intro(app: &Application, device: &Device) {
     println!("{}", app.get_name());
     wait(1).await;
-    println!("{}", app.get_version());
+    println!("version {}", app.get_version());
     wait(1).await;
-    println!("{}", app.get_author());
+    println!("author {}", app.get_author());
     wait(1).await;
-    println!("{}", app.get_date());
+    println!("date {}", app.get_date());
     wait(1).await;
     println!("{}", app.get_description());
     wait(3).await;
