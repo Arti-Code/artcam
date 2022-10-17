@@ -2,7 +2,7 @@
 
 use anyhow::Result;
 use tokio::time::sleep;
-use std::str::FromStr;
+//use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::UdpSocket;
@@ -45,6 +45,22 @@ struct Application {
     date: String
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+struct Device {
+    name: String
+}
+
+impl Device {
+    fn new(name: &str) -> Self {
+        Self {
+            name: name.to_string()
+        }
+    }
+    fn get_name(&self) -> &str {
+        &self.name
+    }
+}
+
 impl Application {
     //fn new(&self, name: &str, version: &str, author: &str, description: &str, date: &str) -> Self {
     //    Self {
@@ -74,26 +90,13 @@ impl Application {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let app: Application=Application {
-        name: "ArtCam (restructured)".to_owned(),
-        version: "0.3.5".to_owned(),
-        author: "Artur Gwoździowski".to_owned(),
-        description:
-        "\tService application used to remote controll robots. 
-        Implemented in RUST programming language.
-        Main features: 
-        ability to establish p2p connection over public internet, 
-        real-time robot camera video streaming, 
-        sending commands to robot and sending back telemetry data"
-        .to_owned(),
-        date: "2022-10-10".to_owned()
-    };
-    intro(&app).await;
+    let app: Application = create_application().await;
+    let device: Device = create_device("kamera").await;
+    intro(&app, &device).await;
 
-    let identify: String=String::from_str(&"kamera").unwrap();
-    println!("device: {}", identify);
-    println!("connecting...");
-    wait(1).await;
+    //let identify: String=String::from_str(&"kamera").unwrap();
+    //println!("device: {}", identify);
+    
 
     let mut m = MediaEngine::default();
     m.register_default_codecs()?;
@@ -179,7 +182,7 @@ async fn main() -> Result<()> {
             Box::pin(async {})
         })).await;
     
-    let offer_encoded = wait_offer(&identify).await;
+    let offer_encoded = wait_offer(device.get_name()).await;
 
     let desc_data = signal::decode(&offer_encoded)?;
     let offer = serde_json::from_str::<RTCSessionDescription>(&desc_data)?;
@@ -191,7 +194,7 @@ async fn main() -> Result<()> {
     let _ = gather_complete.recv().await;
 
     if let Some(local_desc) = peer_connection.local_description().await {
-        send_answer(&local_desc, &identify).await;
+        send_answer(&local_desc, device.get_name()).await;
     } else {
         println!("generate local_description failed!");
     }
@@ -230,7 +233,28 @@ async fn wait(seconds: u32) {
     sleep(Duration::from_secs(seconds as u64)).await;
 }
 
-async fn intro(app: &Application) {
+async fn create_device(name: &str) -> Device {
+    let device: Device = Device::new(name);
+    device
+}
+
+async fn create_application() -> Application {
+    let app: Application=Application {
+        name: "ArtCam (restructured)".to_owned(),
+        version: "0.3.6".to_owned(),
+        author: "Artur Gwoździowski".to_owned(),
+        description:
+        "Service application used to remote controll robots. Implemented in RUST programming language. Main features: 
+        - ability to establish p2p connection over public internet, 
+        - real-time robot camera video streaming, 
+        - sending commands to robot and sending back telemetry data"
+        .to_owned(),
+        date: "2022-10-10".to_owned()
+    };
+    app
+}
+
+async fn intro(app: &Application, device: &Device) {
     println!("{}", app.get_name());
     wait(1).await;
     println!("{}", app.get_version());
@@ -241,6 +265,10 @@ async fn intro(app: &Application) {
     wait(1).await;
     println!("{}", app.get_description());
     wait(3).await;
+    println!("device {}", device.get_name());
+    wait(1).await;
+    println!("connecting...");
+    wait(1).await;
 }
 
 async fn wait_offer(device: &str) -> String {
