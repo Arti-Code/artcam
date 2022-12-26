@@ -94,8 +94,8 @@ async fn main() -> Result<()> {
     let app: Application = create_application().await;
     let device: Device = create_device("kamera").await;
     intro(&app).await;
-    let listener = UdpSocket::bind("127.0.0.1:5004").await.unwrap();
-    let list = Arc::new(listener);
+    //let listener = UdpSocket::bind("127.0.0.1:5004").await.unwrap();
+    let list = Arc::new(UdpSocket::bind("127.0.0.1:5004").await.unwrap());
     loop {
         restart_info(&device).await;
         let mut m = MediaEngine::default();
@@ -251,7 +251,7 @@ async fn create_device(name: &str) -> Device {
 async fn create_application() -> Application {
     let app: Application=Application {
         name: "ArtCam".to_owned(),
-        version: "0.3.6".to_owned(),
+        version: "0.5.0".to_owned(),
         author: "Artur Gwoździowski".to_owned(),
         description:
         "Service application used to remote controll robots. Implemented in RUST programming language. Main features: 
