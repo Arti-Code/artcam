@@ -1,6 +1,6 @@
 [package]
 name = "artcam"
-version = "0.5.1"
+version = "0.6.1"
 edition = "2021"
 authors = ["Artur Gwoździowski <gwozdyk@gmail.com>"]
 
@@ -8,9 +8,9 @@ authors = ["Artur Gwoździowski <gwozdyk@gmail.com>"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-webrtc = "0.5.1"
+webrtc = "0.6.0"
 tokio = { version = "1.21.1", features = ["full"] }
-env_logger = "0.9.1"
+env_logger = "0.10.0"
 hyper = { version = "0.14.20", features = ["full"] }
 signal = {path = "signal" }
 tokio-util = "0.7.4"

@@ -60,15 +60,6 @@ impl Device {
 }
 
 impl Application {
-    //fn new(&self, name: &str, version: &str, author: &str, description: &str, date: &str) -> Self {
-    //    Self {
-    //        name: name.to_string(),
-    //        version: version.to_string(),
-    //        author: author.to_string(),
-    //        description: description.to_string(),
-    //        date: date.to_string()
-    //    }
-    //}
     fn get_name(&self) -> &str {
         &self.name
     }
