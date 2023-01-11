@@ -1,6 +1,6 @@
 [package]
 name = "artcam"
-version = "0.3.3"
+version = "0.7.1"
 edition = "2021"
 authors = ["Artur Gwoździowski <gwozdyk@gmail.com>"]
 
@@ -8,19 +8,18 @@ authors = ["Artur Gwoździowski <gwozdyk@gmail.com>"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-webrtc = "0.5.1"
+webrtc = "0.6.0"
 tokio = { version = "1.21.1", features = ["full"] }
-env_logger = "0.9.1"
-clap = "3.2.22"
-hyper = { version = "0.14.20", features = ["full"] }
-signal = {path = "signal" }
+env_logger = "0.10.0"
+hyper = { version = "0.14.23", features = ["full"] }
 tokio-util = "0.7.4"
-anyhow = "1.0.65"
-chrono = "0.4.22"
+anyhow = "1.0.68"
+chrono = "0.4.23"
 log = "0.4.17"
-serde = { version = "1.0.144", features = ["derive"] }
-serde_json = "1.0.85"
+serde = { version = "1.0.152", features = ["derive"] }
+serde_json = "1.0.91"
 bytes = "1.2.1"
 lazy_static = "1.4.0"
 rand = "0.8.5"
 firebase-rs = "2.0.5"
+base64 = "0.21.0"
