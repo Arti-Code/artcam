@@ -1,6 +1,5 @@
 use anyhow::Result;
 use tokio::time::sleep;
-//use clap::{AppSettings, Arg, Command, App};
 //use std::io::Write;
 use std::sync::Arc;
 use std::time::Duration;
@@ -21,7 +20,6 @@ use webrtc::rtp_transceiver::rtp_codec::RTCRtpCodecCapability;
 use webrtc::track::track_local::track_local_static_rtp::TrackLocalStaticRTP;
 use webrtc::track::track_local::{TrackLocal, TrackLocalWriter};
 use webrtc::Error;
-//use webrtc_util::conn::Conn;
 use serde::{Serialize, Deserialize};
 use firebase_rs::*;
 
@@ -35,16 +33,6 @@ struct Answer {
 struct Offer {
     offer: String
 }
-
-/* #[derive(Serialize, Deserialize, Debug)]
-struct Application {
-    name: String,
-    version: String,
-    author: String,
-    description: String,
-    date: String
-} */
-
 #[derive(Serialize, Deserialize, Debug)]
 struct Device {
     name: String
@@ -61,32 +49,12 @@ impl Device {
     }
 }
 
-/* impl Application {
-    fn get_name(&self) -> &str {
-        &self.name
-    }
-    fn get_version(&self) -> &str {
-        &self.version
-    }
-    fn get_author(&self) -> &str {
-        &self.author
-    }
-    fn get_description(&self) -> &str {
-        &self.description
-    }
-    fn get_date(&self) -> &str {
-        &self.date
-    }
-} */
-
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let mut run: bool = true;
     //let mut rerun: bool = false;
-    //let app = create_application();
     let device: Device = create_device("kamera").await;
-    //intro(&app).await;
     //let listener = UdpSocket::bind("127.0.0.1:5004").await.unwrap();
     let list = Arc::new(UdpSocket::bind("127.0.0.1:5004").await.unwrap());
     loop {
@@ -250,38 +218,6 @@ async fn create_device(name: &str) -> Device {
     let device: Device = Device::new(name);
     device
 }
-
-/* fn create_application() -> Application {
-    let app=Command::new("ArtCam")
-        .version("0.7.0")
-        .author("Artur Gwoździowski")
-        .about("Service application used to remote controll robots implemented in RUST");
-    app
-} */
-
-/* fn create_application() -> Application {
-    let app = Application {
-        name: "ArtCam".into(),
-        version: "0.7.0".into(),
-        author: "Artur Gwoździowski".into(),
-        description: "Service application used to remote controll robots implemented in RUST".into(),
-        date: "2023".into(),
-    };
-    app
-} */
-
-/* async fn intro(app: &App) {
-    println!("{}", app.get_name());
-    wait(1).await;
-    println!("version {}", app.get_version());
-    wait(1).await;
-    println!("author {}", app.get_author());
-    wait(1).await;
-    println!("date {}", app.get_date());
-    wait(1).await;
-    println!("{}", app.get_description());
-    wait(3).await;
-} */
 
 async fn restart_info(device: &Device) {
     println!("device {}", device.get_name());

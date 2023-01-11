@@ -1,6 +1,6 @@
 [package]
 name = "artcam"
-version = "0.7.0"
+version = "0.7.1"
 edition = "2021"
 authors = ["Artur Gwoździowski <gwozdyk@gmail.com>"]
 
@@ -9,7 +9,6 @@ authors = ["Artur Gwoździowski <gwozdyk@gmail.com>"]
 
 [dependencies]
 webrtc = "0.6.0"
-webrtc-util = "0.7"
 tokio = { version = "1.21.1", features = ["full"] }
 env_logger = "0.10.0"
 hyper = { version = "0.14.23", features = ["full"] }
@@ -23,5 +22,4 @@ bytes = "1.2.1"
 lazy_static = "1.4.0"
 rand = "0.8.5"
 firebase-rs = "2.0.5"
-clap = "3.0"
 base64 = "0.21.0"
