@@ -1,6 +1,7 @@
 use anyhow::Result;
 use tokio::time::sleep;
-//use std::str::FromStr;
+//use clap::{AppSettings, Arg, Command, App};
+//use std::io::Write;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::UdpSocket;
@@ -11,7 +12,7 @@ use webrtc::data_channel::data_channel_message::DataChannelMessage;
 use webrtc::data_channel::RTCDataChannel;
 use webrtc::ice_transport::ice_connection_state::RTCIceConnectionState;
 use webrtc::ice_transport::ice_server::RTCIceServer;
-use webrtc::ice_transport::ice_credential_type::RTCIceCredentialType;
+//use webrtc::ice_transport::ice_credential_type::RTCIceCredentialType;
 use webrtc::interceptor::registry::Registry;
 use webrtc::peer_connection::configuration::RTCConfiguration;
 use webrtc::peer_connection::peer_connection_state::RTCPeerConnectionState;
@@ -20,6 +21,7 @@ use webrtc::rtp_transceiver::rtp_codec::RTCRtpCodecCapability;
 use webrtc::track::track_local::track_local_static_rtp::TrackLocalStaticRTP;
 use webrtc::track::track_local::{TrackLocal, TrackLocalWriter};
 use webrtc::Error;
+//use webrtc_util::conn::Conn;
 use serde::{Serialize, Deserialize};
 use firebase_rs::*;
 
@@ -34,14 +36,14 @@ struct Offer {
     offer: String
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+/* #[derive(Serialize, Deserialize, Debug)]
 struct Application {
     name: String,
     version: String,
     author: String,
     description: String,
     date: String
-}
+} */
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Device {
@@ -59,7 +61,7 @@ impl Device {
     }
 }
 
-impl Application {
+/* impl Application {
     fn get_name(&self) -> &str {
         &self.name
     }
@@ -75,16 +77,16 @@ impl Application {
     fn get_date(&self) -> &str {
         &self.date
     }
-}
+} */
 
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let mut run: bool = true;
     //let mut rerun: bool = false;
-    let app: Application = create_application().await;
+    //let app = create_application();
     let device: Device = create_device("kamera").await;
-    intro(&app).await;
+    //intro(&app).await;
     //let listener = UdpSocket::bind("127.0.0.1:5004").await.unwrap();
     let list = Arc::new(UdpSocket::bind("127.0.0.1:5004").await.unwrap());
     loop {
@@ -101,19 +103,27 @@ async fn main() -> Result<()> {
         
         let config = RTCConfiguration {
             ice_servers: vec![RTCIceServer {
+                urls: vec!["stun:stun.l.google.com:19302".to_owned()],
+                ..Default::default()
+            }],
+            /* ice_servers: vec![RTCIceServer {
                 urls: vec!["stun:fr-turn1.xirsys.com".to_owned()],
                 username: "23Xgr3XVCOk2GqoZW5eWhbdXM1EfA8VcC6OVVacJSpFdoljTUOsTcgAoFUvfN4vcAAAAAGNFN29nd296ZHlrMg==".to_owned(),
                 credential: "2ed490ce-4947-11ed-bd3d-0242ac120004".to_owned(),
                 credential_type: RTCIceCredentialType::Password.to_owned()
-            }],
+            }], */
             ..Default::default()
         };
 
         let peer_connection = Arc::new(api.new_peer_connection(config).await?);
         
         let video_track = Arc::new(TrackLocalStaticRTP::new(
-            RTCRtpCodecCapability {mime_type: MIME_TYPE_VP8.to_owned(),
-                ..Default::default()}, "video".to_owned(), "webrtc-rs".to_owned(), ));
+            RTCRtpCodecCapability {
+                mime_type: MIME_TYPE_VP8.to_owned(),
+                ..Default::default()}, 
+            "video".to_owned(), 
+            "webrtc-rs".to_owned(), 
+        ));
         let rtp_sender = peer_connection
             .add_track(Arc::clone(&video_track) as Arc<dyn TrackLocal + Send + Sync>).await?;
 
@@ -140,18 +150,18 @@ async fn main() -> Result<()> {
                     d.on_open(Box::new(move || {
                         println!("[DATACHANNEL OPEN]: {}", d_label2);
                         Box::pin(async move {})
-                    })).await;
+                    }));
 
                     d.on_message(Box::new(move |msg: DataChannelMessage| {
                         let msg_str = String::from_utf8(msg.data.to_vec()).unwrap();
                         println!("[↓]: {}", msg_str);
                         Box::pin(async {})
-                    })).await;
+                    }));
                 })
-            })).await;
+            }));
 
         
-            peer_connection
+        peer_connection
             .on_ice_connection_state_change(Box::new(move |connection_state: RTCIceConnectionState| {
                 println!("[ICE CONNECTION]: {}", connection_state);
                 if connection_state == RTCIceConnectionState::Disconnected {
@@ -161,7 +171,8 @@ async fn main() -> Result<()> {
                     let _ = done_tx1.try_send(());
                 }
                 Box::pin(async {})
-            })).await;
+            })
+        );
 
         let done_tx2 = done_tx.clone();
 
@@ -175,12 +186,13 @@ async fn main() -> Result<()> {
                     let _ = done_tx2.try_send(());
                 }
                 Box::pin(async {})
-            })).await;
+            })
+        );
         
         
         let offer_encoded = wait_offer(device.get_name()).await;
 
-        let desc_data = signal::decode(&offer_encoded)?;
+        let desc_data = decode(&offer_encoded)?;
         let offer = serde_json::from_str::<RTCSessionDescription>(&desc_data)?;
         peer_connection.set_remote_description(offer).await?;
         let answer = peer_connection.create_answer(None).await?;
@@ -239,23 +251,26 @@ async fn create_device(name: &str) -> Device {
     device
 }
 
-async fn create_application() -> Application {
-    let app: Application=Application {
-        name: "ArtCam".to_owned(),
-        version: "0.5.0".to_owned(),
-        author: "Artur Gwoździowski".to_owned(),
-        description:
-        "Service application used to remote controll robots. Implemented in RUST programming language. Main features: 
-        - ability to establish p2p connection over public internet, 
-        - real-time robot camera video streaming, 
-        - sending commands to robot and sending back telemetry data"
-        .to_owned(),
-        date: "2022-10-10".to_owned()
+/* fn create_application() -> Application {
+    let app=Command::new("ArtCam")
+        .version("0.7.0")
+        .author("Artur Gwoździowski")
+        .about("Service application used to remote controll robots implemented in RUST");
+    app
+} */
+
+/* fn create_application() -> Application {
+    let app = Application {
+        name: "ArtCam".into(),
+        version: "0.7.0".into(),
+        author: "Artur Gwoździowski".into(),
+        description: "Service application used to remote controll robots implemented in RUST".into(),
+        date: "2023".into(),
     };
     app
-}
+} */
 
-async fn intro(app: &Application) {
+/* async fn intro(app: &App) {
     println!("{}", app.get_name());
     wait(1).await;
     println!("version {}", app.get_version());
@@ -266,7 +281,7 @@ async fn intro(app: &Application) {
     wait(1).await;
     println!("{}", app.get_description());
     wait(3).await;
-}
+} */
 
 async fn restart_info(device: &Device) {
     println!("device {}", device.get_name());
@@ -308,9 +323,19 @@ async fn wait_offer(device: &str) -> String {
 
 async fn send_answer(answer: &RTCSessionDescription, device: &str) {
     let json_str = serde_json::to_string(answer).unwrap();
-    let b64 = signal::encode(&json_str);
+    let b64 = encode(&json_str);
     let firebase = Firebase::new("https://rtp-to-webrtc-default-rtdb.firebaseio.com")
         .unwrap().at("signaling").at(device);
     let ans: Answer=Answer { answer: b64 };
     firebase.update(&ans).await.unwrap();
+}
+
+fn encode(b: &str) -> String {
+    base64::encode(b)
+}
+
+fn decode(s: &str) -> Result<String> {
+    let b = base64::decode(s)?;
+    let s = String::from_utf8(b)?;
+    Ok(s)
 }
