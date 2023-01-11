@@ -22,6 +22,7 @@ use webrtc::track::track_local::{TrackLocal, TrackLocalWriter};
 use webrtc::Error;
 use serde::{Serialize, Deserialize};
 use firebase_rs::*;
+use base64::{Engine as _, engine::{general_purpose}};
 
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -160,7 +161,7 @@ async fn main() -> Result<()> {
         
         let offer_encoded = wait_offer(device.get_name()).await;
 
-        let desc_data = decode(&offer_encoded)?;
+        let desc_data = decode(&offer_encoded);
         let offer = serde_json::from_str::<RTCSessionDescription>(&desc_data)?;
         peer_connection.set_remote_description(offer).await?;
         let answer = peer_connection.create_answer(None).await?;
@@ -267,11 +268,15 @@ async fn send_answer(answer: &RTCSessionDescription, device: &str) {
 }
 
 fn encode(b: &str) -> String {
-    base64::encode(b)
+    //base64::encode(b)
+    let encoded = general_purpose::STANDARD.encode(b);
+    encoded
 }
 
-fn decode(s: &str) -> Result<String> {
-    let b = base64::decode(s)?;
-    let s = String::from_utf8(b)?;
-    Ok(s)
+fn decode(s: &str) -> String {
+    //let b = base64::decode(s)?;
+    //let b64 = Engine::decode(s).unwrap();
+    let b64 = general_purpose::STANDARD.decode(s).unwrap();
+    let decoded = String::from_utf8(b64).unwrap();
+    decoded
 }
