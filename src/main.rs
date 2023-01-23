@@ -1,6 +1,5 @@
 use anyhow::Result;
 use tokio::time::sleep;
-//use std::io::Write;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::UdpSocket;
@@ -11,7 +10,6 @@ use webrtc::data_channel::data_channel_message::DataChannelMessage;
 use webrtc::data_channel::RTCDataChannel;
 use webrtc::ice_transport::ice_connection_state::RTCIceConnectionState;
 use webrtc::ice_transport::ice_server::RTCIceServer;
-//use webrtc::ice_transport::ice_credential_type::RTCIceCredentialType;
 use webrtc::interceptor::registry::Registry;
 use webrtc::peer_connection::configuration::RTCConfiguration;
 use webrtc::peer_connection::peer_connection_state::RTCPeerConnectionState;
@@ -54,22 +52,19 @@ impl Device {
 #[tokio::main]
 async fn main() -> Result<()> {
     let mut run: bool = true;
-    //let mut rerun: bool = false;
     let device: Device = create_device("kamera").await;
-    //let listener = UdpSocket::bind("127.0.0.1:5004").await.unwrap();
-    let list = Arc::new(UdpSocket::bind("127.0.0.1:5004").await.unwrap());
+    let sock = UdpSocket::bind("127.0.0.1:5004").await.unwrap();
+    let listener = Arc::new(sock);
+    let mut m = MediaEngine::default();
+    m.register_default_codecs()?;
+    let mut registry = Registry::new();
+    registry = register_default_interceptors(registry, &mut m)?;
+    let api = APIBuilder::new()
+        .with_media_engine(m)
+        .with_interceptor_registry(registry)
+        .build();
     loop {
-        restart_info(&device).await;
-        let mut m = MediaEngine::default();
-        m.register_default_codecs()?;
-        let mut registry = Registry::new();
-        registry = register_default_interceptors(registry, &mut m)?;
-
-        let api = APIBuilder::new()
-            .with_media_engine(m)
-            .with_interceptor_registry(registry)
-            .build();
-        
+        restart_info(&device).await; 
         let config = RTCConfiguration {
             ice_servers: vec![RTCIceServer {
                 urls: vec!["stun:stun.l.google.com:19302".to_owned()],
@@ -85,7 +80,6 @@ async fn main() -> Result<()> {
         };
 
         let peer_connection = Arc::new(api.new_peer_connection(config).await?);
-        
         let video_track = Arc::new(TrackLocalStaticRTP::new(
             RTCRtpCodecCapability {
                 mime_type: MIME_TYPE_VP8.to_owned(),
@@ -109,13 +103,10 @@ async fn main() -> Result<()> {
         peer_connection
             .on_data_channel(Box::new(move |d: Arc<RTCDataChannel>| {
                 let d_label = d.label().to_owned();
-                //let d_id = d.id();
                 println!("[NEW DATACHANNEL]: {}", d_label);
-
                 Box::pin(async move {
                     let _d2 = Arc::clone(&d);
                     let d_label2 = d_label.clone();
-                    //let d_id2 = d_id;
                     d.on_open(Box::new(move || {
                         println!("[DATACHANNEL OPEN]: {}", d_label2);
                         Box::pin(async move {})
@@ -149,9 +140,6 @@ async fn main() -> Result<()> {
             .on_peer_connection_state_change(Box::new(move |s: RTCPeerConnectionState| {
                 println!("[PEER CONNECTION]: {}", s);
                 if s == RTCPeerConnectionState::Failed {
-                    // Wait until PeerConnection has had no network activity for 30 seconds or another failure. It may be reconnected using an ICE Restart.
-                    // Use webrtc.PeerConnectionStateDisconnected if you are interested in detecting faster timeout.
-                    // Note that the PeerConnection may come back from PeerConnectionStateDisconnected.
                     let _ = done_tx2.try_send(());
                 }
                 Box::pin(async {})
@@ -160,7 +148,6 @@ async fn main() -> Result<()> {
         
         
         let offer_encoded = wait_offer(device.get_name()).await;
-
         let desc_data = decode(&offer_encoded);
         let offer = serde_json::from_str::<RTCSessionDescription>(&desc_data)?;
         peer_connection.set_remote_description(offer).await?;
@@ -177,7 +164,7 @@ async fn main() -> Result<()> {
         }
         let done_tx3 = done_tx.clone();
         
-        let l = Arc::clone(&list);
+        let l = Arc::clone(&listener);
         tokio::spawn(async move {
             let mut inbound_rtp_packet = vec![0u8; 1600]; // UDP MTU
             while let Ok((n, _)) = l.recv_from(&mut inbound_rtp_packet).await {
@@ -205,8 +192,6 @@ async fn main() -> Result<()> {
         if !run {
             break;
         }
-        //rerun = true;
-        //listener = UdpSocket::bind("127.0.0.1:9004").await.unwrap();
     }
     Ok(())
 }
@@ -247,7 +232,7 @@ async fn wait_offer(device: &str) -> String {
                 firebase2.update(&clear_offer).await.unwrap();
             },
             Ok(_) => {
-                sleep(Duration::from_secs(10)).await;
+                sleep(Duration::from_secs(3)).await;
             },
             Err(_) => {
                 sleep(Duration::from_secs(3)).await;
@@ -268,14 +253,11 @@ async fn send_answer(answer: &RTCSessionDescription, device: &str) {
 }
 
 fn encode(b: &str) -> String {
-    //base64::encode(b)
     let encoded = general_purpose::STANDARD.encode(b);
     encoded
 }
 
 fn decode(s: &str) -> String {
-    //let b = base64::decode(s)?;
-    //let b64 = Engine::decode(s).unwrap();
     let b64 = general_purpose::STANDARD.decode(s).unwrap();
     let decoded = String::from_utf8(b64).unwrap();
     decoded
