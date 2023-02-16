@@ -1,8 +1,10 @@
 use anyhow::Result;
-use tokio::time::sleep;
+//use webrtc::rtp_transceiver::rtp_sender;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::net::UdpSocket;
+//use std::env::args;
+use tokio::time::sleep;
+use tokio::net::{UdpSocket};
 use webrtc::api::interceptor_registry::register_default_interceptors;
 use webrtc::api::media_engine::{MediaEngine, MIME_TYPE_VP8};
 use webrtc::api::APIBuilder;
@@ -51,19 +53,25 @@ impl Device {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    println!("*** A R T C A M ***");
+    sleep(Duration::from_secs(1)).await;
+    println!("version. 0.8");
+    sleep(Duration::from_secs(1)).await;
+    println!("by Artur Gwoździowski ®2023");
+    sleep(Duration::from_secs(1)).await;
     let mut run: bool = true;
-    let device: Device = create_device("kamera").await;
     let sock = UdpSocket::bind("127.0.0.1:5004").await.unwrap();
     let listener = Arc::new(sock);
-    let mut m = MediaEngine::default();
-    m.register_default_codecs()?;
-    let mut registry = Registry::new();
-    registry = register_default_interceptors(registry, &mut m)?;
-    let api = APIBuilder::new()
-        .with_media_engine(m)
-        .with_interceptor_registry(registry)
-        .build();
     loop {
+        let device: Device = create_device("kamera").await;
+        let mut m = MediaEngine::default();
+        m.register_default_codecs()?;
+        let mut registry = Registry::new();
+        registry = register_default_interceptors(registry, &mut m)?;
+        let api = APIBuilder::new()
+            .with_media_engine(m)
+            .with_interceptor_registry(registry)
+            .build();
         restart_info(&device).await; 
         let config = RTCConfiguration {
             ice_servers: vec![RTCIceServer {
@@ -78,7 +86,7 @@ async fn main() -> Result<()> {
             }], */
             ..Default::default()
         };
-
+    
         let peer_connection = Arc::new(api.new_peer_connection(config).await?);
         let video_track = Arc::new(TrackLocalStaticRTP::new(
             RTCRtpCodecCapability {
@@ -89,17 +97,25 @@ async fn main() -> Result<()> {
         ));
         let rtp_sender = peer_connection
             .add_track(Arc::clone(&video_track) as Arc<dyn TrackLocal + Send + Sync>).await?;
-
+        let rtp_sender2 = rtp_sender.clone();
         tokio::spawn(async move {
             let mut rtcp_buf = vec![0u8; 1500];
-            while let Ok((_, _)) = rtp_sender.read(&mut rtcp_buf).await {}
+            let mut bytes = 0;
+            while let Ok((byte_num, _)) = rtp_sender.read(&mut rtcp_buf).await {
+                bytes += byte_num;
+                if bytes >= 999000 {
+                    println!("bytes: {}", bytes);
+                    bytes -= 999000;
+                }
+            }
+
             Result::<()>::Ok(())
         });
-
-        let (done_tx, mut done_rx) = tokio::sync::mpsc::channel::<()>(1);
+    
+        let (done_tx, mut done_rx) = tokio::sync::mpsc::channel::<()>(5);
         let done_tx1 = done_tx.clone();
-        let (_data_tx, mut _data_rx) = tokio::sync::mpsc::channel::<()>(1);
-
+        let (_data_tx, mut _data_rx) = tokio::sync::mpsc::channel::<()>(5);
+    
         peer_connection
             .on_data_channel(Box::new(move |d: Arc<RTCDataChannel>| {
                 let d_label = d.label().to_owned();
@@ -111,7 +127,7 @@ async fn main() -> Result<()> {
                         println!("[DATACHANNEL OPEN]: {}", d_label2);
                         Box::pin(async move {})
                     }));
-
+                
                     d.on_message(Box::new(move |msg: DataChannelMessage| {
                         let msg_str = String::from_utf8(msg.data.to_vec()).unwrap();
                         println!("[↓]: {}", msg_str);
@@ -119,7 +135,7 @@ async fn main() -> Result<()> {
                     }));
                 })
             }));
-
+        
         
         peer_connection
             .on_ice_connection_state_change(Box::new(move |connection_state: RTCIceConnectionState| {
@@ -133,9 +149,9 @@ async fn main() -> Result<()> {
                 Box::pin(async {})
             })
         );
-
+    
         let done_tx2 = done_tx.clone();
-
+    
         peer_connection
             .on_peer_connection_state_change(Box::new(move |s: RTCPeerConnectionState| {
                 println!("[PEER CONNECTION]: {}", s);
@@ -152,11 +168,11 @@ async fn main() -> Result<()> {
         let offer = serde_json::from_str::<RTCSessionDescription>(&desc_data)?;
         peer_connection.set_remote_description(offer).await?;
         let answer = peer_connection.create_answer(None).await?;
-
+    
         let mut gather_complete = peer_connection.gathering_complete_promise().await;
         peer_connection.set_local_description(answer).await?;
         let _ = gather_complete.recv().await;
-
+    
         if let Some(local_desc) = peer_connection.local_description().await {
             send_answer(&local_desc, device.get_name()).await;
         } else {
@@ -178,7 +194,7 @@ async fn main() -> Result<()> {
                 }
             }
         });
-
+    
         tokio::select! {
             _ = done_rx.recv() => {
                 println!("[SIGNAL]: done");
@@ -188,7 +204,15 @@ async fn main() -> Result<()> {
                 run = false;
             }
         };
+        let trans = peer_connection.get_transceivers().await;
+        let mut i = 0;
+        for _ in trans.iter() {
+            println!("transceivers: {}", i);
+            i += 1;
+        }
+        peer_connection.remove_track(&rtp_sender2).await.unwrap();
         peer_connection.close().await?;
+        println!("[CONNECTION] close");
         if !run {
             break;
         }
